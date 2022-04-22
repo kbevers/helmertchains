@@ -4,11 +4,14 @@ import numpy as np
 import pyproj
 import pytest
 
-from helmert import Helmert
+from helmert import Helmert, Convention
+
 
 def is_vector_close(A: np.array, B: np.array):
     for i in range(3):
         if not math.isclose(A[i], B[i]):
+            print(f"{A=}")
+            print(f"{B=}")
             return False
     return True
 
@@ -104,3 +107,37 @@ def test_inverse_transform(H1, coord):
     # Verify that the inverse transform works
     assert is_vector_close(coord, c2), "Inverse property verification failed!"
 
+
+def test_convention(H1, coord):
+    """
+    Test the two different rotation conventions.
+
+    Tested against PROJ which we know does this correct.
+    """
+    projstring = f"""
+        +proj=helmert +x={H1.x} +y={H1.y} +z={H1.z}
+                      +rx={H1.rx} +ry={H1.ry} +rz={H1.rz}
+                      +s={H1.s}  +convention=position_vector
+    """
+    position_vector = pyproj.transformer.Transformer.from_pipeline(projstring)
+
+    a = np.array(position_vector.transform(coord[0], coord[1], coord[2]))
+    b = H1.transform(coord)
+
+    assert is_vector_close(a, b)
+
+    projstring = f"""
+        +proj=helmert +x={H1.x} +y={H1.y} +z={H1.z}
+                      +rx={H1.rx} +ry={H1.ry} +rz={H1.rz}
+                      +s={H1.s}  +convention=coordinate_frame
+    """
+    position_vector = pyproj.transformer.Transformer.from_pipeline(projstring)
+
+    a = np.array(position_vector.transform(coord[0], coord[1], coord[2]))
+
+    # Rebuild rotation matrix using coordinate frame convention
+    H1.convention = Convention.COORDINATE_FRAME
+    H1.R = H1._build_rot_matrix(H1.rx, H1.ry, H1.rz)
+    b = H1.transform(coord)
+
+    assert is_vector_close(a, b)
