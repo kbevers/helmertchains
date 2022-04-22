@@ -1,0 +1,7 @@
+name: helmertchains
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - pyproj
+  - pytest
