@@ -1,0 +1,140 @@
+\documentclass[11pt,twocolumn]{article}
+    % General document formatting
+    \usepackage[margin=0.7in]{geometry}
+    \usepackage[parfill]{parskip}
+    \usepackage[utf8]{inputenc}
+
+    % Related to math
+    \usepackage{amsmath,amssymb,amsfonts,amsthm}
+
+\newcommand{\matr}[1]{\mathbf{#1}}
+
+\title{On the Chaining of Helmert transformations}
+\author{Kristian Evers}
+\date{2022-04-22}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+The purposes of this document is to demonstrate that a chain of consecutive
+Helmert transformations can be combined into one set of parameters with a bit of
+algebra.
+
+\section{About the Helmert transformation}
+
+The Helmert transformation formulas as we know it:
+
+\begin{equation}
+    \begin{bmatrix}
+        x
+        \\ 
+        y
+        \\ 
+        z
+    \end{bmatrix}^B
+%
+    =
+%
+    \begin{bmatrix}
+        t_x \\ t_y \\ t_z
+    \end{bmatrix}
+%
+    + (1+s\cdot10^{-6})
+%
+    \begin{bmatrix}
+        1       & -r_{z}  &  r_{y}   \\ 
+        r_{z}   &  1      & -r_{x} \\ 
+        -r_{y}   &  r_{x}  &  1
+    \end{bmatrix}
+%
+    \begin{bmatrix}
+        x \\ y \\ z
+    \end{bmatrix}^A
+\end{equation}
+
+can also be expressed as
+
+\begin{equation}
+    \label{eq:simplehelmert}
+    P_{B} = T + c\matr{R}P_{A}
+\end{equation}
+
+where $P_{A}$ and $P_{B}$ are the input and output coordinat vectors,
+$T$ is the translation vector, $R$ is the rotation matrix and the scale
+factor $c$ is expressed as
+
+\begin{equation}
+    c = 1+s\cdot10^{-6}
+\end{equation}
+
+\section{Chaing transformations}
+
+It is quite common to perform several Helmert transformations
+in a row, e.g.
+
+\begin{equation}
+    \label{eq:helmert1}
+    P_B = T_1 + c_1\matr{R_1}P_A
+\end{equation}
+
+\begin{equation}
+    \label{eq:helmert2}
+    P_C = T + c_2\matr{R}_2P_B
+\end{equation}
+
+where the coordinate $P_A$ transformed first with the parameters of the first
+step ($T_1$, $c_1$ \& $\matr{R_1}$) and then the parameters of the second step
+($T_2$, $c_2$ \& $\matr{R_2}$).
+
+This is computationally heavy and can be avoided by
+substituting eq. \ref{eq:helmert1} into eq. \ref{eq:helmert2}:
+
+\begin{equation}
+    P_C = T_2 + c_2\matr{R_2} \left( T_1 + c_1 \matr{R_1} P_A \right)
+\end{equation}
+
+\begin{equation}
+    \label{eq:helmert_substituted}
+    P_C = T_2 + c_2\matr{R_2}T_1 + c_2c_1 \matr{R_2}\matr{R_1} P_A
+\end{equation}
+
+which can be simplified using the following expressions
+
+\begin{equation}
+    \label{eq:t3}
+    T_3 = T_2 + c_2\matr{R_2}T_1
+\end{equation}
+
+\begin{equation}
+    \label{eq:c3}
+    c_3 = c_2 \cdot c_1
+\end{equation}
+
+\begin{equation}
+    \label{eq:r3}
+    R_3 = \matr{R_2}\matr{R_1}
+\end{equation}
+
+Substituting equations \ref{eq:t3}, \ref{eq:c3} and \ref{eq:r3} into
+eq. \ref{eq:helmert_substituted} we get
+
+\begin{equation}
+    P_C = T_3 + c_3 \matr{R_3} P_A
+\end{equation}
+
+which is on the same form as the Helmert transformation show in
+\ref{eq:simplehelmert}.
+
+A chained Helmert transformation can be sped up significantly by first
+determining a combined set of transformation parameters using equations
+\ref{eq:t3}, \ref{eq:c3} and \ref{eq:r3} and then using them in eq.
+\ref{eq:simplehelmert}.
+
+Shown here is only the 7-parameter version of the Helmert transformation
+but of course this obviously also extends to the 14-parameter version and
+combinations of the two.
+
+
+\end{document}
