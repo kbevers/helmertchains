@@ -34,21 +34,21 @@ class Helmert:
         self.T = np.array([self.x, self.y, self.z])
         self.R = self._build_rot_matrix(self.rx, self.ry, self.rz)
 
-    def __add__(self: 'Helmert', H2: 'Helmert') -> 'Helmert':
+    def __add__(self: "Helmert", H2: "Helmert") -> "Helmert":
         # determine scaling, translations and rotations
         H1 = self
 
-        c = H1.c*H2.c
-        T = H2.T + H2.c*H2.R.dot(H1.T)
-        R = H2.R@H1.R
+        c = H1.c * H2.c
+        T = H2.T + H2.c * H2.R.dot(H1.T)
+        R = H2.R @ H1.R
 
         # decompose the above
-        s = (c-1)*1e6
+        s = (c - 1) * 1e6
         x = T[0]
         y = T[1]
         z = T[2]
 
-        rad2arcsec: float = lambda rad: np.rad2deg(rad*3600.0)
+        rad2arcsec: float = lambda rad: np.rad2deg(rad * 3600.0)
         rx = rad2arcsec(R[2][1])
         ry = rad2arcsec(R[0][2])
         rz = rad2arcsec(R[1][0])
@@ -76,6 +76,6 @@ class Helmert:
         Transform a cartesian coordinate.
         """
         if inverse:
-            return -self.T + 1/self.c * self.R.T.dot(P)
+            return -self.T + 1 / self.c * self.R.T.dot(P)
 
         return self.T + self.c * self.R.dot(P)
