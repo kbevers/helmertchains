@@ -1,83 +1,100 @@
+import math
+
 import numpy as np
 import pyproj
 
-def build_rot_matrix(rx: float, ry: float, rz: float):
-    """Construct rotation matrix with correctly scaled rotation parameters."""
-    arcsec2rad: float = lambda arcsec: np.deg2rad(arcsec) / 3600.0
+from helmert import Helmert
 
-    rx =  arcsec2rad(rx)
-    ry =  arcsec2rad(ry)
-    rz =  arcsec2rad(rz)
+np.set_printoptions(precision=4)
 
-    return np.array([
-        [1,    -rz,  ry],
-        [ rz,    1, -rx],
-        [-ry,  rx,    1],
-    ])
+def assert_vector_closeness(A: np.array, B: np.array, errmsg: str):
+    for i in range(3):
+        if not math.isclose(A[i], B[i]):
+            raise SystemExit(errmsg)
 
 # Parameters for transformation 1
-x1 =    0.041
-y1 =    0.041
-z1 =   -0.049
-s1 =   -0.00158
-rx1 =   0.000891
-ry1 =   0.00539
-rz1 =  -0.008772
+H1 = Helmert(
+    x =    23.041,
+    y =    0.041,
+    z =   -0.049,
+    s =   -0.00158,
+    rx =   0.000891,
+    ry =   0.00539,
+    rz =  -0.008772,
+)
 
 # Parameters for transformation 2
-x2 =   0.054
-y2 =  -0.014
-z2 =   0.292
-s2 =   0.00242
-rx2 =  0.000521
-ry2 =  0.00923
-rz2 = -0.004592
-
-# Set up scalars, vectors and matrices
-c1 = 1 + s1*1e-6
-c2 = 1 + s2*1e-6
-
-T1 = np.array([x1, y1, z1])
-T2 = np.array([x2, y2, z2])
-
-R1 = build_rot_matrix(rx1, ry1, rz1)
-R2 = build_rot_matrix(rx2, ry2, rz2)
+H2 = Helmert(
+    x =   0.054,
+    y =  -0.014,
+    z =   0.292,
+    s =   0.00242,
+    rx =  0.000521,
+    ry =  0.00923,
+    rz = -0.004592,
+)
 
 
 # Inputer coordinate (12.0E,55.0N)
 Pa = np.array([3586469.6568, 762327.6588, 5201383.5231])
 
 # Two consecutive helmerts
-Pb = T1 + c1*R1.dot(Pa)
-Pc = T2 + c2*R2.dot(Pb)
+Pb = H1.transform(Pa)
+Pc = H2.transform(Pb)
 
 # Combined helmert parameters
-c3 = c1*c2
-T3 = T2 + c2*R2.dot(T1)
-R3 = R2@R1
+H3 = H1+H2
+Pd = H3.transform(Pa)
 
-Pd = T3 + c3*R3.dot(Pa)
 
 # Verify that the results are the same, if they are the math is correct
-if not np.isclose(Pc, Pd).all():
-    raise SystemExit("Math verification failed!")
+assert_vector_closeness(Pc, Pd, "Math verification failed!")    
 
 # Now check results against PROJ
 pipeline = f"""
     +proj=pipeline +step
-    +proj=helmert +x={x1} +y={y1} +z={z1}
-                  +rx={rx1} +ry={ry1} +rz={rz1}
-                  +s={s1}  +convention=position_vector
+    +proj=helmert +x={H1.x} +y={H1.y} +z={H1.z}
+                  +rx={H1.rx} +ry={H1.ry} +rz={H1.rz}
+                  +s={H1.s}  +convention=position_vector
                   +step
-    +proj=helmert +x={x2} +y={y2} +z={z2}
-                  +rx={rx2} +ry={ry2} +rz={rz2}
-                  +s={s2} +convention=position_vector
+    +proj=helmert +x={H2.x} +y={H2.y} +z={H2.z}
+                  +rx={H2.rx} +ry={H2.ry} +rz={H2.rz}
+                  +s={H2.s} +convention=position_vector
 """
 helmert = pyproj.transformer.Transformer.from_pipeline(pipeline)
-Pe = helmert.transform(Pa[0], Pa[1], Pa[2])
+Pe = np.array(helmert.transform(Pa[0], Pa[1], Pa[2]))
 
 # Verify that the results are the same, if they are my math is the same as PROJ's
-if not np.isclose(Pd, Pe).all():
-    raise SystemExit("PROJ verification failed!")
+assert_vector_closeness(Pd, Pe, "PROJ verification failed!")
+
+
+# Are Helmert transformations commutative?
+H4 = H1+H2+H3
+H5 = H3+H2+H1
+
+Pf = H4.transform(Pa)
+Pg = H5.transform(Pa)
+# Verify that Helmerts commute(?)
+assert_vector_closeness(Pf, Pg, "Commutative property verification failed!")
+
+
+# Test inverse transform
+Ph = H1.transform(Pa)
+Pi = H1.transform(Ph, inverse=True)
+
+# Verify that the inverse transform works
+assert_vector_closeness(Pa, Pi, "Inverse property verification failed!")
+
 
 print("Test succeeded!")
+print()
+print(f"{Pc=}")
+print(f"{Pd=}")
+print(f"{Pe=}")
+print()
+print(f"{Pf=}")
+print(f"{Pg=}")
+print()
+print(f"{Pa=}, start")
+print(f"{Ph=}, frem")
+print(f"{Pi=}, tilbage")
