@@ -3,7 +3,7 @@ Fun with Helmert transformations.
 """
 from enum import Enum
 
-import numpy as np
+from numpy import array, rad2deg, deg2rad
 
 
 class Convention(Enum):
@@ -34,8 +34,17 @@ class Helmert:
 
         self.c = 1 + self.s * 1e-6
 
-        self.T = np.array([self.x, self.y, self.z])
+        self.T = array([self.x, self.y, self.z])
         self.R = self._build_rot_matrix(self.rx, self.ry, self.rz)
+
+    def __repr__(self) -> "Helmert":
+        return(f"Helmert(x={self.x}, y={self.y}, z={self.z}, s={self.s}, "
+               f"rx={self.rx}, ry={self.ry}, rz={self.rz}, Convention={self.convention})")
+    
+    def __str__(self) -> str:
+        return(f"Tx: {self.x:10.7f} m      Ty: {self.y:10.7f} m      Tz: {self.z:10.7f} m\n"
+               f"Rx: {self.rx:10.7f} arcsec Ry: {self.ry:10.7f} arcsec Rz: {self.rz:10.7f} arcsec\n"
+               f"s: {self.s:11.9f} ppm  Convention: {self.convention}")
 
     def __add__(self: "Helmert", H2: "Helmert") -> "Helmert":
         # determine scaling, translations and rotations
@@ -51,7 +60,7 @@ class Helmert:
         y = T[1]
         z = T[2]
 
-        rad2arcsec: float = lambda rad: np.rad2deg(rad * 3600.0)
+        rad2arcsec: float = lambda rad: rad2deg(rad * 3600.0)
         rx = rad2arcsec(R[2][1])
         ry = rad2arcsec(R[0][2])
         rz = rad2arcsec(R[1][0])
@@ -60,13 +69,13 @@ class Helmert:
 
     def _build_rot_matrix(self, rx: float, ry: float, rz: float):
         """Construct rotation matrix with correctly scaled parameters."""
-        arcsec2rad: float = lambda arcsec: np.deg2rad(arcsec) / 3600.0
+        arcsec2rad: float = lambda arcsec: deg2rad(arcsec) / 3600.0
 
         rx = arcsec2rad(rx)
         ry = arcsec2rad(ry)
         rz = arcsec2rad(rz)
 
-        R = np.array(
+        R = array(
             [
                 [1, -rz, ry],
                 [rz, 1, -rx],
@@ -81,7 +90,7 @@ class Helmert:
         # which we get by transposing the rotation matrix
         return R.T
 
-    def transform(self, P: np.array, inverse: bool = False) -> np.array:
+    def transform(self, P: array, inverse: bool = False) -> array:
         """
         Transform a cartesian coordinate.
         """
