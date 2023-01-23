@@ -487,6 +487,14 @@ class Helmert:
                 - self.dT * dt
                 + 1 / (self.c + self.dc * dt) * self.R.T.dot(posObs.position())
             )
+            if posObs.stn_vel:
+                posObs_out.stn_vel = True
+                posObs_out.velocity(
+                    posObs.velocity()
+                    - self.dT
+                    - self.dc * posObs.position()
+                    - self.dR.dot(posObs.position())
+                )
         else:
             posObs_out.position(
                 self.T
@@ -494,4 +502,12 @@ class Helmert:
                 + (self.c + self.dc * dt)
                 * (self.R + self.dR * dt).dot(posObs.position())
             )
+            if posObs.stn_vel:
+                posObs_out.stn_vel = True
+                posObs_out.velocity(
+                    posObs.velocity()
+                    + self.dT
+                    + self.dc * posObs.position()
+                    + self.dR.dot(posObs.position())
+                )
         return posObs_out
