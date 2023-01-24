@@ -1,4 +1,11 @@
-"""Fun with Helmert transformations."""
+"""
+Helmert transformations primarily for geodetic applications.
+
+This small collection provides a set of tool to chain multiple 7 or 14 parameter
+Helmert transformations together to one single Helmert transformation and apply that
+transformation on a cartesian ECEF (Earth Centered Earth Fixed) station coordinate with
+optional station velocity.
+"""
 
 from enum import Enum
 from numpy import array, rad2deg, deg2rad
@@ -6,27 +13,142 @@ from math import isclose
 
 
 class Observation:
+    """
+    Station observation class.
+
+    Station observation class for cartesian ECEF coordinates and optional station
+    velocity.
+    """
+
     def __init__(
         self,
         x: float = 0.0,
         y: float = 0.0,
         z: float = 0.0,
+        epoch: float = 0.0,
         vx: float = 0.0,
         vy: float = 0.0,
         vz: float = 0.0,
-        epoch: float = 0.0,
         stn_vel: bool = False,
     ) -> None:
         self.x = x
         self.y = y
         self.z = z
+        self.epoch = epoch
         self.vx = vx
         self.vy = vy
         self.vz = vz
-        self.epoch = epoch
         self.stn_vel = stn_vel
 
+    def __repr__(self) -> str:
+        """
+        Readable representation of the Observation object.
+
+        Returns
+        -------
+        str
+            Detailed info on the Observation object.
+        """
+        return (
+            f"Observation(x={self.x}, y={self.y}, z={self.z}, "
+            f"vx=(self.vx), vy=(self.vy), vz=(self.vz), "
+            f"epoch={self.epoch}, stn_vel={self.stn_vel})"
+        )
+
+    def __str__(self) -> str:
+        """
+        Pretty print of the Observation object.
+
+        Returns
+        -------
+        str
+            Human readable representation of the Observation object. Elements are
+            formated and units included.
+        """
+        string = f"X={self.x:13.5f} m    Y={self.y:13.5f} m    Z={self.z:13.5f} m  "
+        string += f"Epoch: {self.epoch:8.3f} yr  "
+        if self.stn_vel:
+            string += f"\nVX={self.vx:12.5f} m/yr VY={self.vy:12.5f} m/yr "
+            string += f"VZ={self.vz:12.5f} m/yr  "
+        return string
+
+    def __add__(self: "Observation", obs2: "Observation") -> "Observation":
+        """
+        Add two Observation objects.
+
+        obs = obs1 + obs2
+
+        Parameters
+        ----------
+        obs2 : "Observation"
+            Observation object to be added to obs1.
+
+        Returns
+        -------
+        "Observation"
+            Observation object with the sum of each element. stn_vel is True if obs1
+            and/or obs2 stn_vel is true.
+
+        """
+        obs1 = self
+        x = obs1.x + obs2.x
+        y = obs1.y + obs2.y
+        z = obs1.z + obs2.z
+        epoch = obs1.epoch + obs2.epoch
+        vx = obs1.vx + obs2.vx
+        vy = obs1.vy + obs2.vy
+        vz = obs1.vz + obs2.vz
+        stn_vel = obs1.stn_vel or obs2.stn_vel
+        return Observation(x, y, z, epoch, vx, vy, vz, stn_vel)
+
+    def __sub__(self: "Observation", obs2: "Observation") -> "Observation":
+        """
+        Subtract one Observation object from another.
+
+        obs = obs1 - obs2
+
+        Parameters
+        ----------
+        obs2 : "Observation"
+            Observation object to be added to obs1.
+
+        Returns
+        -------
+        "Observation"
+            Observation object with the difference of each element in obs1 and obs2.
+            stn_vel is True if obs1 and/or obs2 stn_vel is true.
+
+        """
+        obs1 = self
+        x = obs1.x - obs2.x
+        y = obs1.y - obs2.y
+        z = obs1.z - obs2.z
+        epoch = obs1.epoch - obs2.epoch
+        vx = obs1.vx - obs2.vx
+        vy = obs1.vy - obs2.vy
+        vz = obs1.vz - obs2.vz
+        stn_vel = obs1.stn_vel or obs2.stn_vel
+        return Observation(x, y, z, epoch, vx, vy, vz, stn_vel)
+
     def position(self, pos: array = None) -> array:
+        """
+        Set and return position of the station.
+
+        Updates the X, Y, Z coordinates and returns the new station coordinates.
+        If no coordinates is given the existing station coordinate is returned.
+
+        Parameters
+        ----------
+        pos : array, optional
+            3 element array with the new cartesian X, Y, Z coordinate.
+            The default is None.
+
+        Returns
+        -------
+        array
+            3 element array with the current cartesian X, Y, Z coordinate.
+
+        """
         if pos is None:
             return array([self.x, self.y, self.z])
         else:
@@ -36,6 +158,23 @@ class Observation:
             return array([self.x, self.y, self.z])
 
     def velocity(self, vel: array = None) -> array:
+        """
+        Set and return velocity of the station.
+
+        Updates the X, Y, Z velocity and returns the new station velocity.
+        If no velocity is given the existing station velocity is returned.
+
+        Parameters
+        ----------
+        pos : array, optional
+            3 element array with the new cartesian X, Y, Z velocity.
+            The default is None.
+
+        Returns
+        -------
+        array
+            3 element array with the current cartesian X, Y, Z velocity.
+        """
         if vel is None:
             return array([self.vx, self.vy, self.vz])
         else:
@@ -45,62 +184,47 @@ class Observation:
             self.stn_vel = True
             return array([self.vx, self.vy, self.vz])
 
-    def observation(self, obs: array = None) -> array:
-        if obs is None:
-            return array([self.x, self.y, self.z, self.epoch])
-        else:
-            self.x = obs[0]
-            self.y = obs[1]
-            self.z = obs[2]
-            self.epoch = obs[3]
-            return array([self.x, self.y, self.z, self.epoch])
+    def set_target_epoch(self, target_epoch: float) -> "Observation":
+        """
+        Express the position at a new epoch using the velocity.
 
-    def __repr__(self) -> str:
-        return (
-            f"Observation(x={self.x}, y={self.y}, z={self.z}, "
-            f"vx=(self.vx), vy=(self.vy), vz=(self.vz), "
-            f"epoch={self.epoch}, stn_vel={self.stn_vel})"
-        )
+        Use the observation velocity to calculate the position difference between the
+        current observation epoch and the target epoch and add this difference to the
+        current position.
 
-    def __str__(self) -> str:
-        string = f"X={self.x:13.5f} m    Y={self.y:13.5f} m    Z={self.z:13.5f} m  "
-        string += f"Epoch: {self.epoch:8.3f} yr  "
+        Parameters
+        ----------
+        target_epoch : float
+            Epoch to express the position at.
+
+        Returns
+        -------
+        "Observation"
+            Observation object at the new epoch.
+
+        """
+        dt = target_epoch - self.epoch
+        self.epoch = target_epoch
         if self.stn_vel:
-            string += f"\nVX={self.vx:12.5f} m/yr VY={self.vy:12.5f} m/yr "
-            string += f"VZ={self.vz:12.5f} m/yr  "
-        return string
-
-    def __add__(self: "Observation", obs2: "Observation") -> "Observation":
-        obs1 = self
-        x = obs1.x + obs2.x
-        y = obs1.y + obs2.y
-        z = obs1.z + obs2.z
-        epoch = obs1.epoch + obs2.epoch
-        return Observation(x, y, z, epoch)
-
-    def __sub__(self: "Observation", obs2: "Observation") -> "Observation":
-        obs1 = self
-        x = obs1.x - obs2.x
-        y = obs1.y - obs2.y
-        z = obs1.z - obs2.z
-        epoch = obs1.epoch - obs2.epoch
-        return Observation(x, y, z, epoch)
+            self.x += self.vx * dt
+            self.y += self.vy * dt
+            self.z += self.vz * dt
+        return self
 
 
 class Convention(Enum):
-    """Conventions to choose between for the Helmert transform."""
+    """Conventions to choose between representation of the Helmert transform."""
 
     POSITION_VECTOR = 1
     COORDINATE_FRAME = 2
 
 
 class Helmert:
-    """
-    14 parameter Helmert transformation class.
+    """14 parameter Helmert transformation class.
 
     Class to express 14 parameter Helmert transformations and chain them together to
-    concatenate multiple 14 parameter Helmert transformations into a single 14 parameter
-    Helmert transformation.
+    concatenate multiple Helmert transformations into a single 14 parameter Helmert
+    transformation.
     """
 
     def __init__(
@@ -125,6 +249,9 @@ class Helmert:
     ) -> None:
         """
         Create an instance of the Helmert class.
+
+        The 14 parameter Helmert object provides the information nedded to transform an
+        observation from reference frame A to reference frame B.
 
         Parameters
         ----------
@@ -472,9 +599,27 @@ class Helmert:
         self.dR = self._build_drot_matrix(self.drx, self.dry, self.drz)
         return self
 
-    #    def transform(self, P: array, inverse: bool = False) -> array:
     def transform(self, posObs: "Observation", inverse: bool = False) -> "Observation":
-        """Transform a cartesian coordinate."""
+        """
+        Apply the Helmert transformation on the observation.
+
+        Apply the 14 parameter Helmert transformation on the observation to transform it
+        from reference frame A to reference frame B.
+
+        Parameters
+        ----------
+        posObs : "Observation"
+            coordinate observation, epoch and optional velocity to be transformed.
+        inverse : bool, optional
+            Reverse the transformation such that it transforms from B to A.
+            The default is False.
+
+        Returns
+        -------
+        "Observation"
+            The transformed observation, epoch and optional velocity.
+            If posObs.stn_vel is False, the transformed velocity will be zero.
+        """
         posObs_out = Observation()
         dt = posObs.epoch - self.ref_epoch
         if self.vel_model:
