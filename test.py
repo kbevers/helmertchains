@@ -4,7 +4,7 @@ import numpy as np
 import pyproj
 import pytest
 
-from helmert import Helmert, Convention
+from helmert import Helmert, Convention, Observation
 
 
 def is_vector_close(A: np.array, B: np.array):
@@ -13,6 +13,14 @@ def is_vector_close(A: np.array, B: np.array):
             print(f"{A=}")
             print(f"{B=}")
             return False
+    return True
+
+
+def is_observation_close(A: "Observation", B: "Observation"):
+    if not is_vector_close(A.position(), B.position()):
+        return False
+    if not is_vector_close(A.velocity(), B.velocity()):
+        return False
     return True
 
 
@@ -27,6 +35,7 @@ def H1():
         rx=0.000891,
         ry=0.00539,
         rz=-0.008772,
+        ref_epoch=2022.0,
     )
 
 
@@ -40,6 +49,7 @@ def H2():
         rx=0.000521,
         ry=0.00923,
         rz=-0.004592,
+        ref_epoch=2022.0,
     )
 
 
@@ -50,11 +60,11 @@ def H3(H1, H2):
 
 @pytest.fixture()
 def coord():
-    """Input coordinate (12.0E,55.0N)"""
-    return np.array([3586469.6568, 762327.6588, 5201383.5231])
+    """Input coordinate (12.0E,55.0N,2022.0)"""
+    return Observation(3586469.6568, 762327.6588, 5201383.5231, 2022.0)
 
 
-def test_two_consecutive_helmerts(H1, H2, coord):
+def test_two_consecutive_7helmerts(H1, H2, coord):
     """Two consecutive helmerts"""
     c1 = H1.transform(coord)
     c2 = H2.transform(c1)
@@ -64,7 +74,7 @@ def test_two_consecutive_helmerts(H1, H2, coord):
     c3 = H3.transform(coord)
 
     # Verify that the results are the same, if they are the math is correct
-    assert is_vector_close(c2, c3), "Math verification failed!"
+    assert is_vector_close(c2.position(), c3.position()), "Math verification failed!"
 
 
 def test_same_results_as_proj(H1, H2, H3, coord):
@@ -80,15 +90,15 @@ def test_same_results_as_proj(H1, H2, H3, coord):
                     +s={H2.s} +convention=position_vector
     """
     helmert = pyproj.transformer.Transformer.from_pipeline(pipeline)
-    c = np.array(helmert.transform(coord[0], coord[1], coord[2]))
+    c = np.array(helmert.transform(coord.x, coord.y, coord.z))
 
     c3 = H3.transform(coord)
 
     # Verify that the results are the same, if they are my math is the same as PROJ's
-    assert is_vector_close(c, c3), "PROJ verification failed!"
+    assert is_vector_close(c, c3.position()), "PROJ verification failed!"
 
 
-def test_helmert_commutativeness(H1, H2, H3, coord):
+def test_7helmert_commutativeness(H1, H2, H3, coord):
     """Are Helmert transformations commutative?"""
     H4 = H1 + H2 + H3
     H5 = H3 + H2 + H1
@@ -96,7 +106,9 @@ def test_helmert_commutativeness(H1, H2, H3, coord):
     c1 = H4.transform(coord)
     c2 = H5.transform(coord)
     # Verify that Helmerts commute(?)
-    assert is_vector_close(c1, c2), "Commutative property verification failed!"
+    assert is_vector_close(
+        c1.position(), c2.position()
+    ), "Commutative property verification failed!"
 
 
 def test_inverse_transform(H1, coord):
@@ -105,7 +117,9 @@ def test_inverse_transform(H1, coord):
     c2 = H1.transform(c1, inverse=True)
 
     # Verify that the inverse transform works
-    assert is_vector_close(coord, c2), "Inverse property verification failed!"
+    assert is_vector_close(
+        coord.position(), c2.position()
+    ), "Inverse property verification failed!"
 
 
 def test_convention(H1, coord):
@@ -121,10 +135,10 @@ def test_convention(H1, coord):
     """
     position_vector = pyproj.transformer.Transformer.from_pipeline(projstring)
 
-    a = np.array(position_vector.transform(coord[0], coord[1], coord[2]))
+    a = np.array(position_vector.transform(coord.x, coord.y, coord.z))
     b = H1.transform(coord)
 
-    assert is_vector_close(a, b)
+    assert is_vector_close(a, b.position())
 
     projstring = f"""
         +proj=helmert +x={H1.x} +y={H1.y} +z={H1.z}
@@ -133,11 +147,11 @@ def test_convention(H1, coord):
     """
     position_vector = pyproj.transformer.Transformer.from_pipeline(projstring)
 
-    a = np.array(position_vector.transform(coord[0], coord[1], coord[2]))
+    a = np.array(position_vector.transform(coord.x, coord.y, coord.z))
 
     # Rebuild rotation matrix using coordinate frame convention
     H1.convention = Convention.COORDINATE_FRAME
     H1.R = H1._build_rot_matrix(H1.rx, H1.ry, H1.rz)
     b = H1.transform(coord)
 
-    assert is_vector_close(a, b)
+    assert is_vector_close(a, b.position())
