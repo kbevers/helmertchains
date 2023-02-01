@@ -10,8 +10,8 @@
 \newcommand{\matr}[1]{\mathbf{#1}}
 
 \title{On the Chaining of Helmert transformations}
-\author{Kristian Evers}
-\date{2022-04-22}
+\author{Kristian Evers \& Lars Stenseng}
+\date{2022-08-10}
 
 \begin{document}
 \maketitle
@@ -132,9 +132,13 @@ determining a combined set of transformation parameters using equations
 \ref{eq:t3}, \ref{eq:c3} and \ref{eq:r3} and then using them in eq.
 \ref{eq:simplehelmert}.
 
-Shown here is only the 7-parameter version of the Helmert transformation
-but of course this obviously also extends to the 14-parameter version and
-combinations of the two.
+\section{Including velocity}
+Following the notation above we introduce the input, $V_A$ and output $V_B$ velocity vectors and the translation rate vector $\dot{T}$, rotation rate matrix $\dot{\matr{R}}$, and the scale rate factor $\dot{c}$.
+
+
+\begin{equation}
+	V_B = V_A + \dot{T} + \dot{c} \dot{\matr{R}} P_A
+\end{equation}
 
 
 \end{document}
